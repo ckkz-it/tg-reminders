@@ -111,6 +111,8 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
 TELEGRAM_TOKEN = None
+TELEGRAM_HOOK_URL = None
+TELEGRAM_PROXY = None
 
 try:
     from .local_settings import *
