@@ -6,7 +6,9 @@ import logging
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s',
                     level=logging.INFO)
-logger = logging.getLogger('main')
+logger = logging.getLogger('MAIN')
+
+tg = None
 
 
 class CoreConfig(AppConfig):
@@ -15,6 +17,7 @@ class CoreConfig(AppConfig):
     def ready(self):
         from core.telegram_api import TelegramBot
         logger.info('Telegram set up')
+        global tg
         tg = TelegramBot(settings.TELEGRAM_TOKEN)
         tg.setup()
         sleep(1)

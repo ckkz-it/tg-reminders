@@ -1,12 +1,16 @@
 from django.conf import settings
 
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Dispatcher
+from telegram.ext import Updater, Dispatcher
 from telegram import Bot
 from telegram.utils.request import Request
 
 import logging
 
-logger = logging.getLogger('main')
+from .handlers import HANDLERS
+
+logger = logging.getLogger('MAIN')
+
+DISPATCHER = None
 
 
 class TelegramBot(object):
@@ -18,25 +22,15 @@ class TelegramBot(object):
                               'password': settings.TELEGRAM_PROXY_PASSWORD
                           })
         self.bot = Bot(token=token, request=request)
-        self.dispatcher = Dispatcher(self.bot, None, workers=0)
+        self.dispatcher = Dispatcher(self.bot, None)
 
     def setup(self):
-        self.__setup_webhook()
         self.__setup_handlers()
+        self.__setup_webhook()
 
     def __setup_webhook(self):
         self.bot.set_webhook(settings.TELEGRAM_HOOK_URL)
 
     def __setup_handlers(self):
-        handler = MessageHandler(Filters.text | Filters.command, self.handle_message)
-        self.dispatcher.add_handler(handler)
-
-    @staticmethod
-    def unknown(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, text='Sorry, I didn\'t understand that command.')
-
-    def handle_message(self, update):
-        logger.info(f'Received: {update.message}')
-        chat_id = update.message.chat_id
-        if update.message.text == '/start':
-            self.unknown(self.bot, update)
+        for handler in HANDLERS:
+            self.dispatcher.add_handler(handler)
