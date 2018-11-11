@@ -2,14 +2,7 @@ from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from telegram import Update
-
-import logging
-import json
-
-from .apps import tg
-
-logger = logging.getLogger('MAIN')
+from .tasks import logger, ProcessWebhook
 
 
 @require_POST
@@ -17,6 +10,5 @@ logger = logging.getLogger('MAIN')
 def telegram_hook(request):
     logger.info('webhook')
     unicode_body = request.body.decode('utf-8')
-    update = Update.de_json(json.loads(unicode_body), tg.bot)
-    tg.dispatcher.process_update(update)
+    ProcessWebhook().delay(unicode_body=unicode_body)
     return HttpResponse('OK')

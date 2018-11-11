@@ -1,4 +1,5 @@
 import os
+import sys
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -110,9 +111,54 @@ STATICFILES_DIRS = []
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
+LOGGING = {
+    'root': {
+        'level': 'WARNING',
+        'handlers': ['console'],
+    },
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': "[%(asctime)s] %(levelname)s %(message)s",
+            'datefmt': "%d/%b/%Y %H:%M:%S"
+        }
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout,
+            'formatter': 'verbose'
+        },
+        'file_celery': {
+            'level': 'DEBUG',
+            'formatter': 'verbose',
+            'filename': os.path.join(BASE_DIR, 'celery_tasks.log'),
+            'class': 'logging.handlers.RotatingFileHandler',
+            'maxBytes': 1024 * 1024 * 20,  # 20MB
+            'backupCount': 5,
+
+        }
+    },
+    'loggers': {
+        'core.tasks': {
+            'handlers': ['console', 'file_celery'],
+            'level': 'DEBUG',
+            'propagate': True,
+        }
+    }
+}
+
 TELEGRAM_TOKEN = None
 TELEGRAM_HOOK_URL = None
 TELEGRAM_PROXY = None
+
+BROKER_URL = None
+
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_ENABLE_UTC = True
 
 try:
     from .local_settings import *

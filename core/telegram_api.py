@@ -10,8 +10,6 @@ from .handlers import HANDLERS
 
 logger = logging.getLogger('MAIN')
 
-DISPATCHER = None
-
 
 class TelegramBot(object):
 

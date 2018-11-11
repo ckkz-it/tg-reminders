@@ -1,0 +1,2 @@
+celery -A reminders beat
+celery -A reminders worker -l INFO -P eventlet -Q main
