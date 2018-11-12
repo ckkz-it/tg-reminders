@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db.models import F
 
 import celery
 import logging
@@ -73,16 +74,45 @@ class CheckReminders(BaseTask):
     def run(self, *args, **kwargs):
         logger.info('Starting check reminders')
         logger.info(self.tg)
-        reminders = Reminder.objects.filter(date__lte=arrow.now('Europe/Moscow').datetime)
+        reminders = Reminder.objects.filter(
+            date__lte=arrow.now('Europe/Moscow').datetime, done=False, processing=False
+        )
         for reminder in reminders:
-            tg_chat = reminder.telegram_chat
+            if reminder.repeat_count:
+                RemindByPeriod().apply_async(kwargs={'id': reminder.id})
+                return
+
             text = 'Reminding you!'
             if reminder.message:
                 text += f'\n{reminder.message}'
-            self.tg.bot.send_message(
-                chat_id=tg_chat.telegram_id, text=text
+            self.tg.bot.send_message(chat_id=reminder.telegram_chat.telegram_id, text=text)
+            reminder.done = True
+            reminder.save(update_fields=['done'])
+
+
+class RemindByPeriod(BaseTask):
+    def run(self, *args, **kwargs):
+        reminder = Reminder.objects.get(id=kwargs['id'])
+        reminder.processing = True
+        reminder.repeat_count = F('repeat_count') - 1
+        reminder.save(update_fields=['processing, repeat_count'])
+        reminder.refresh_from_db()
+        repeat_task = False
+        if reminder.repeat_count:
+            repeat_task = True
+        else:
+            reminder.done = True
+            reminder.processing = False
+            reminder.save(update_fields=['processing', 'done'])
+
+        text = 'Reminding you!'
+        if reminder.message:
+            text += f'\n{reminder.message}'
+        self.tg.bot.send_message(chat_id=reminder.telegram_chat.telegram_id, text=text)
+        if repeat_task:
+            RemindByPeriod().apply_async(
+                countdown=reminder.repeat_period, kwargs={'id': reminder.id}
             )
-        reminders.delete()  # set reminder to inactive
 
 
 app.tasks.register(CheckReminders())

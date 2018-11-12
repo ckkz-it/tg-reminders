@@ -1,12 +1,10 @@
 from django.db import models
 
-import datetime
+import arrow
 
-
-# Create your models here.
 
 def get_default_remind_date():
-    return datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
+    return arrow.now('Europe/Moscow').shift(minutes=10).datetime
 
 
 class TelegramChat(models.Model):
@@ -20,5 +18,7 @@ class Reminder(models.Model):
     telegram_chat = models.ForeignKey('TelegramChat', on_delete=models.CASCADE)
     date = models.DateTimeField(default=get_default_remind_date)
     message = models.TextField(blank=True)
-    repeat = models.IntegerField(default=0)
+    repeat_count = models.IntegerField(default=0)
     repeat_period = models.IntegerField(default=10)
+    done = models.BooleanField(default=False)
+    processing = models.BooleanField(default=False)
