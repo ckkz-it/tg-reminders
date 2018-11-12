@@ -36,19 +36,21 @@ class MetaBaseTask(type):
 
 class BaseTask(celery.Task, metaclass=MetaBaseTask):
     serializer = settings.CELERY_TASK_SERIALIZER
-    # max_retries = settings.CELERY_MAX_RETRIES
-    max_retries = 0
+    max_retries = 3
     ignore_result = True
-    # default_retry_delay = settings.CELERY_RETRY_DELAY
+    default_retry_delay = 10
     queue = 'main'
 
     def __init__(self):
         self.tg = tg
 
     def on_prerun(self, *args, **kwargs):
-        if self.tg is None:
-            logger.info('tg is None, setup it')
-            self.setup_tg()
+        try:
+            if self.tg is None:
+                logger.info('tg is None, setup it')
+                self.setup_tg()
+        except Exception as exc:
+            self.retry(exc=exc)
 
     def setup_tg(self):
         logger.info('Telegram set up')
@@ -77,6 +79,10 @@ class CheckReminders(BaseTask):
         reminders = Reminder.objects.filter(
             date__lte=arrow.now('Europe/Moscow').datetime, done=False, processing=False
         )
+        if not reminders:
+            logger.info('No reminders to remind')
+            return
+
         for reminder in reminders:
             if reminder.repeat_count:
                 RemindByPeriod().apply_async(kwargs={'id': reminder.id})
@@ -87,7 +93,7 @@ class CheckReminders(BaseTask):
                 text += f'\n{reminder.message}'
             self.tg.bot.send_message(chat_id=reminder.telegram_chat.telegram_id, text=text)
             reminder.done = True
-            reminder.save(update_fields=['done'])
+            reminder.save()
 
 
 class RemindByPeriod(BaseTask):
@@ -95,15 +101,15 @@ class RemindByPeriod(BaseTask):
         reminder = Reminder.objects.get(id=kwargs['id'])
         reminder.processing = True
         reminder.repeat_count = F('repeat_count') - 1
-        reminder.save(update_fields=['processing, repeat_count'])
+        reminder.save()
         reminder.refresh_from_db()
         repeat_task = False
-        if reminder.repeat_count:
+        if reminder.repeat_count > 0:
             repeat_task = True
         else:
             reminder.done = True
             reminder.processing = False
-            reminder.save(update_fields=['processing', 'done'])
+            reminder.save()
 
         text = 'Reminding you!'
         if reminder.message:
@@ -111,12 +117,13 @@ class RemindByPeriod(BaseTask):
         self.tg.bot.send_message(chat_id=reminder.telegram_chat.telegram_id, text=text)
         if repeat_task:
             RemindByPeriod().apply_async(
-                countdown=reminder.repeat_period, kwargs={'id': reminder.id}
+                countdown=reminder.repeat_period * 60, kwargs={'id': reminder.id}
             )
 
 
 app.tasks.register(CheckReminders())
 app.tasks.register(ProcessWebhook())
+app.tasks.register(RemindByPeriod())
 
 
 @worker_ready.connect()
