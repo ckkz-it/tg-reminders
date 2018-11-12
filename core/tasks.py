@@ -1,9 +1,9 @@
 from django.conf import settings
-import django
 
 import celery
 import logging
 import json
+import arrow
 
 from celery.signals import worker_ready
 
@@ -11,8 +11,11 @@ from telegram import Update
 
 from reminders.celery import app
 from core.telegram_api import TelegramBot
+from core.models import Reminder
 
 logger = logging.getLogger(__name__)
+
+tg = None
 
 
 def task_prerun(fn, prerun):
@@ -39,19 +42,8 @@ class BaseTask(celery.Task, metaclass=MetaBaseTask):
     queue = 'main'
 
     def __init__(self):
-        self.tg = None
+        self.tg = tg
 
-    def on_prerun(self, *args, **kwargs):
-        pass
-
-    def run(self, *args, **kwargs):
-        return super().run(*args, **kwargs)
-
-    def on_success(self, retval, task_id, args, kwargs):
-        pass
-
-
-class ProcessWebhook(BaseTask):
     def on_prerun(self, *args, **kwargs):
         if self.tg is None:
             logger.info('tg is None, setup it')
@@ -63,8 +55,16 @@ class ProcessWebhook(BaseTask):
         self.tg.setup()
 
     def run(self, *args, **kwargs):
+        return super().run(*args, **kwargs)
+
+    def on_success(self, retval, task_id, args, kwargs):
+        pass
+
+
+class ProcessWebhook(BaseTask):
+
+    def run(self, *args, **kwargs):
         logger.info('got webhook')
-        logger.info(kwargs)
         update = Update.de_json(json.loads(kwargs['unicode_body']), self.tg.bot)
         self.tg.dispatcher.process_update(update)
 
@@ -73,7 +73,16 @@ class CheckReminders(BaseTask):
     def run(self, *args, **kwargs):
         logger.info('Starting check reminders')
         logger.info(self.tg)
-        pass
+        reminders = Reminder.objects.filter(date__lte=arrow.now('Europe/Moscow').datetime)
+        for reminder in reminders:
+            tg_chat = reminder.telegram_chat
+            text = 'Reminding you!'
+            if reminder.message:
+                text += f'\n{reminder.message}'
+            self.tg.bot.send_message(
+                chat_id=tg_chat.telegram_id, text=text
+            )
+        reminders.delete()  # set reminder to inactive
 
 
 app.tasks.register(CheckReminders())
@@ -83,5 +92,6 @@ app.tasks.register(ProcessWebhook())
 @worker_ready.connect()
 def setup_webhook(sender, **kwargs):
     logger.info('Worker ready')
+    global tg
     tg = TelegramBot(settings.TELEGRAM_TOKEN)
     tg.setup()
