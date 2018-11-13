@@ -16,7 +16,8 @@ from core.models import Reminder
 
 logger = logging.getLogger(__name__)
 
-tg = None
+
+# tg = None
 
 
 def task_prerun(fn, prerun):
@@ -38,11 +39,11 @@ class BaseTask(celery.Task, metaclass=MetaBaseTask):
     serializer = settings.CELERY_TASK_SERIALIZER
     max_retries = 3
     ignore_result = True
-    default_retry_delay = 10
+    default_retry_delay = 5
     queue = 'main'
 
     def __init__(self):
-        self.tg = tg
+        self.tg = None
 
     def on_prerun(self, *args, **kwargs):
         try:
@@ -65,7 +66,6 @@ class BaseTask(celery.Task, metaclass=MetaBaseTask):
 
 
 class ProcessWebhook(BaseTask):
-
     def run(self, *args, **kwargs):
         logger.info('got webhook')
         update = Update.de_json(json.loads(kwargs['unicode_body']), self.tg.bot)
@@ -129,6 +129,5 @@ app.tasks.register(RemindByPeriod())
 @worker_ready.connect()
 def setup_webhook(sender, **kwargs):
     logger.info('Worker ready')
-    global tg
     tg = TelegramBot(settings.TELEGRAM_TOKEN)
     tg.setup()

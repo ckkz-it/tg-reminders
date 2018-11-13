@@ -1,2 +1,2 @@
 celery -A reminders beat
-celery -A reminders worker -l INFO -P eventlet -Q main
+celery -A reminders worker -l INFO -P eventlet -Q main --concurrency=1
