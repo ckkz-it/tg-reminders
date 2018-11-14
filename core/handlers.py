@@ -9,33 +9,62 @@ from .models import TelegramChat, Reminder
 logger = logging.getLogger(__name__)
 
 
-def remind_day(now):
+def remind_month_and_day(now):
     answer = yield 'Which day to set reminder? Type "-" to set today!'
+    month = now.month
     if answer.text == '-':
-        return now.day
+        return month, now.day
     else:
         while True:
+            if answer.text == '-':
+                return month, now.day
             try:
                 day = int(answer.text)
                 if day < 1 or day > 31:
-                    answer = yield 'day should be less than 31 and bigger than 1'
+                    answer = yield 'Day should be from 1 to 31'
                     continue
                 break
             except ValueError:
+                answer = yield 'Day should be a number'
+
+        if now.day > day:
+            answer = yield (f'Day {day} is already passed. Did you mean other month?\nIf so, '
+                            f'specify which one, type "-" to choose day again')
+            while True:
                 if answer.text == '-':
-                    return now.day
-                answer = yield 'day should be a number'
-        return day
+                    # Restart
+                    yield None
+                try:
+                    month = int(answer.text)
+                    if month < 1 or month > 12:
+                        answer = yield 'Month should be from 1 to 12'
+                        continue
+                    break
+                except ValueError:
+                    answer = yield 'Month should be a number'
+        return month, day
 
 
-def remind_hour(day):
-    answer = yield f'Ok, day set to {day}, which hour?'
+def remind_hour(now, month, day):
+    if month != now.month:
+        answer = yield f'Ok, day set to {day} of {month} month, which hour?'
+    else:
+        answer = yield f'Ok, day set to {day}, which hour?'
     return answer.text
 
 
 def remind_minute(hour):
     answer = yield f'Hour is {hour}, what about minutes?'
-    return answer.text
+    while True:
+        try:
+            minute = int(answer.text)
+            if minute < 0 or minute > 59:
+                answer = yield 'Minute should be a number'
+                continue
+            break
+        except ValueError:
+            answer = yield 'Minute should be a number'
+    return minute
 
 
 def remind_message(minute):
@@ -49,15 +78,24 @@ def remind_message(minute):
 def remind_dialog():
     now = arrow.now('Europe/Moscow')
     year = now.year
-    month = now.month
 
-    day = yield from remind_day(now)
-    hour = yield from remind_hour(day)
+    month, day = yield from remind_month_and_day(now)
+    if month < now.month:
+        year += 1
+    hour = yield from remind_hour(now, month, day)
     minute = yield from remind_minute(hour)
     answer, message = yield from remind_message(minute)
 
     date = arrow.get(
-        f'{year} {month} {day} {hour} {minute} Europe/Moscow', 'YYYY MM D HH m ZZZ'
+        f'{year} {month} {day} {hour} {minute} Europe/Moscow', [
+            'YYYY MM D HH m ZZZ',
+            'YYYY M D HH m ZZZ',
+            'YYYY M D H m ZZZ',
+            'YYYY MM D HH m ZZZ',
+            'YYYY MM DD HH m ZZZ',
+            'YYYY M DD H m ZZZ',
+            'YYYY M DD HH m ZZZ'
+        ]
     )
 
     if date < now:
@@ -109,9 +147,16 @@ class TelegramHandlers(object):
         if update.message.text == '/remind':
             # Start new
             self.remind_dialog.pop(chat_id, None)
+        if update.message.text == '/cancel':
+            self.remind_dialog.pop(chat_id, None)
+            bot.sendMessage(chat_id=chat_id, text='Canceled')
+            return
         if chat_id in self.remind_dialog:
             try:
                 answer = self.remind_dialog[chat_id].send(update.message)
+                if answer is None:
+                    # Restart
+                    raise StopIteration
             except StopIteration:
                 del self.remind_dialog[chat_id]
                 return self.remind(bot, update)
