@@ -17,9 +17,6 @@ from core.models import Reminder
 logger = logging.getLogger(__name__)
 
 
-# tg = None
-
-
 def task_prerun(fn, prerun):
     def wrapped(*args, **kwargs):
         prerun(*args, **kwargs)
@@ -44,6 +41,7 @@ class BaseTask(celery.Task, metaclass=MetaBaseTask):
 
     def __init__(self):
         self.tg = None
+        self.default_text = 'Reminding you!'
 
     def on_prerun(self, *args, **kwargs):
         try:
@@ -88,7 +86,7 @@ class CheckReminders(BaseTask):
                 RemindByPeriod().apply_async(kwargs={'id': reminder.id})
                 return
 
-            text = 'Reminding you!'
+            text = self.default_text
             if reminder.message:
                 text += f'\n{reminder.message}'
             self.tg.bot.send_message(chat_id=reminder.telegram_chat.telegram_id, text=text)
@@ -111,7 +109,7 @@ class RemindByPeriod(BaseTask):
             reminder.processing = False
             reminder.save()
 
-        text = 'Reminding you!'
+        text = self.default_text
         if reminder.message:
             text += f'\n{reminder.message}'
         self.tg.bot.send_message(chat_id=reminder.telegram_chat.telegram_id, text=text)

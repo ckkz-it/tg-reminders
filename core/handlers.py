@@ -5,112 +5,9 @@ import arrow
 import collections
 
 from .models import TelegramChat, Reminder
+from .generators import remind_dialog
 
 logger = logging.getLogger(__name__)
-
-
-def remind_month_and_day(now):
-    answer = yield 'Which day to set reminder? Type "-" to set today!'
-    month = now.month
-    if answer.text == '-':
-        return month, now.day
-    else:
-        while True:
-            if answer.text == '-':
-                return month, now.day
-            try:
-                day = int(answer.text)
-                if day < 1 or day > 31:
-                    answer = yield 'Day should be from 1 to 31'
-                    continue
-                break
-            except ValueError:
-                answer = yield 'Day should be a number'
-
-        if now.day > day:
-            answer = yield (f'Day {day} is already passed. Did you mean other month?\nIf so, '
-                            f'specify which one, type "-" to choose day again')
-            while True:
-                if answer.text == '-':
-                    # Restart
-                    yield None
-                try:
-                    month = int(answer.text)
-                    if month < 1 or month > 12:
-                        answer = yield 'Month should be from 1 to 12'
-                        continue
-                    break
-                except ValueError:
-                    answer = yield 'Month should be a number'
-        return month, day
-
-
-def remind_hour(now, month, day):
-    if month != now.month:
-        answer = yield f'Ok, day set to {day} of {month} month, which hour?'
-    else:
-        answer = yield f'Ok, day set to {day}, which hour?'
-    return answer.text
-
-
-def remind_minute(hour):
-    answer = yield f'Hour is {hour}, what about minutes?'
-    while True:
-        try:
-            minute = int(answer.text)
-            if minute < 0 or minute > 59:
-                answer = yield 'Minute should be a number'
-                continue
-            break
-        except ValueError:
-            answer = yield 'Minute should be a number'
-    return minute
-
-
-def remind_message(minute):
-    answer = yield f'Minute is {minute}. Any message? "-" for empty'
-    if answer.text == '-':
-        return answer, ''
-    else:
-        return answer, answer.text
-
-
-def remind_dialog():
-    now = arrow.now('Europe/Moscow')
-    year = now.year
-
-    month, day = yield from remind_month_and_day(now)
-    if month < now.month:
-        year += 1
-    hour = yield from remind_hour(now, month, day)
-    minute = yield from remind_minute(hour)
-    answer, message = yield from remind_message(minute)
-
-    date = arrow.get(
-        f'{year} {month} {day} {hour} {minute} Europe/Moscow', [
-            'YYYY MM D HH m ZZZ',
-            'YYYY M D HH m ZZZ',
-            'YYYY M D H m ZZZ',
-            'YYYY MM D HH m ZZZ',
-            'YYYY MM DD HH m ZZZ',
-            'YYYY M DD H m ZZZ',
-            'YYYY M DD HH m ZZZ'
-        ]
-    )
-
-    if date < now:
-        yield 'Date must be in future'
-        return
-
-    chat = TelegramChat.objects.get(telegram_id=answer.chat_id)
-    reminder = Reminder.objects.create(
-        telegram_chat=chat, date=date.datetime, message=message
-    )
-
-    text = f'Will remind you {date.humanize()} ({date.format("HH:mm, D MMMM, dddd, YYYY")})'
-    if message:
-        text += f'\nReminder: {message}'
-    yield text
 
 
 class TelegramHandlers(object):
@@ -118,6 +15,11 @@ class TelegramHandlers(object):
         self.help_text = '/remind  -  type this command to start setting reminder'
         self.start_text = 'This is a simple reminder, type /help to see how to use it. Basic command is /remind'
         self.remind_dialog = collections.defaultdict(remind_dialog)
+        self.current_command = None
+        self.function_commands_map = {
+            'remind': self.remind,
+            'todo': self.todo
+        }
 
     @staticmethod
     def unknown(bot, update):
@@ -141,16 +43,29 @@ class TelegramHandlers(object):
 
         bot.send_message(chat_id=update.message.chat_id, text=message)
 
+    def handle_message(self, bot, update):
+        if '/' not in update.message.text:
+            if self.current_command is not None:
+                return self.function_commands_map[self.current_command](bot, update)
+            else:
+                return self.unknown(bot, update)
+    
     def remind(self, bot, update):
         logger.info(f'Received: {update.message}')
         chat_id = update.message.chat_id
+
         if update.message.text == '/remind':
             # Start new
             self.remind_dialog.pop(chat_id, None)
+            answer = next(self.remind_dialog[chat_id])
+            logger.info(f'Answer: {answer}')
+            bot.sendMessage(chat_id=chat_id, text=answer)
+            return
         if update.message.text == '/cancel':
             self.remind_dialog.pop(chat_id, None)
             bot.sendMessage(chat_id=chat_id, text='Canceled')
             return
+
         if chat_id in self.remind_dialog:
             try:
                 answer = self.remind_dialog[chat_id].send(update.message)
@@ -203,6 +118,6 @@ class TelegramHandlers(object):
             CommandHandler('start', self.start),
             CommandHandler('help', self.help),
             CommandHandler('remindi', self.remindi, pass_args=True),
-            MessageHandler(Filters.text | Filters.command, self.remind),
+            MessageHandler(Filters.text | Filters.command, self.handle_message),
             MessageHandler(Filters.text, self.unknown)
         ]

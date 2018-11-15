@@ -22,3 +22,10 @@ class Reminder(models.Model):
     repeat_period = models.IntegerField(default=10)
     done = models.BooleanField(default=False)
     processing = models.BooleanField(default=False)
+
+
+class Todo(models.Model):
+    telegram_chat = models.ForeignKey('TelegramChat', on_delete=models.CASCADE)
+    message = models.TextField()
+    category = models.TextField(blank=True)
+    done = models.BooleanField(default=False)
