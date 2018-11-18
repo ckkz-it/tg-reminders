@@ -9,5 +9,5 @@ from .tasks import ProcessWebhook
 @csrf_exempt
 def telegram_hook(request):
     unicode_body = request.body.decode('utf-8')
-    ProcessWebhook().delay(unicode_body=unicode_body)
+    ProcessWebhook().delay(unicode_body)
     return HttpResponse('OK')

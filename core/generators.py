@@ -1,6 +1,8 @@
 import arrow
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
-from .models import TelegramChat, Reminder
+from .models import TelegramChat, Reminder, Todo
+from .telegram_api import Message, Markdown
 
 
 def remind_dialog():
@@ -68,7 +70,7 @@ def remind_month_and_day(now):
         if now.day > day:
             answer = yield (f'Day {day} is already passed. Did you mean other month?\nIf so, '
                             f'specify which one, type "-" to choose day again')
-            month = yield from check_if_valid(
+            month = yield from check_if_valid_date_piece(
                 answer, 'Month should be from 1 to 12', 'Month should be a number',
                 0, 13, with_default=True, default_value=None
             )
@@ -85,7 +87,7 @@ def remind_hour(now, month, day):
 
 def remind_minute(hour):
     answer = yield f'Hour is {hour}, what about minutes?'
-    minute = yield from check_if_valid(
+    minute = yield from check_if_valid_date_piece(
         answer, 'Minute should be a number', 'Minute should be a number', -1, 60
     )
     return minute
@@ -99,26 +101,16 @@ def remind_message(minute):
         return answer, answer.text
 
 
-def ask_yes_or_no(question):
-    answer = yield question
-    while not (
-            'yes' in answer.text.lower() or 'no' in answer.text.lower() or
-            'y' in answer.text.lower() or 'n' in answer.text.lower()
-    ):
-        answer = yield '"yes" or "no?"'
-    return 'yes' or 'y' in answer.text.lower()
-
-
 def reminder_repeat():
     should_repeat = ask_yes_or_no('Should repeat reminder?')
     if should_repeat:
         answer = yield 'How many times?'
-        repeat_count = yield from check_if_valid(
+        repeat_count = yield from check_if_valid_date_piece(
             answer, 'Should be less than 100 and bigger than 0', 'It should be a number', -1, 100
         )
         answer = yield 'What period between reminds? In minutes.'
 
-        repeat_period = yield from check_if_valid(
+        repeat_period = yield from check_if_valid_date_piece(
             answer, 'Should be less than 100', 'It should be a number', 1, 100
         )
 
@@ -127,7 +119,33 @@ def reminder_repeat():
         return None, None
 
 
-def check_if_valid(answer, message1, message2, more_than, less_than, with_default=False, default_value=None):
+def todo_dialog(chat_id):
+    answer = yield 'Write a new todo message'
+    message = answer.text
+
+    categories = list()
+    for todo in Todo.objects.filter(telegram_chat__telegram_id=chat_id, done=False):
+        categories.append([InlineKeyboardButton(todo.category)])
+
+    reply_markup = InlineKeyboardMarkup(categories)
+    answer = yield Message('Choose category or create new one', reply_markup=reply_markup)
+    category = answer.text
+
+    todo = Todo.objects.create(message=message, category=category)
+    yield Markdown(f'Todo created\n*Message:* {todo.message}\nCategory: {todo.category}')
+
+
+def ask_yes_or_no(question):
+    answer = yield question
+    while not (
+            'yes' in answer.text.lower() or 'no' in answer.text.lower() or
+            'y' in answer.text.lower() or 'n' in answer.text.lower()
+    ):
+        answer = yield '"yes" or "no?"'
+    return 'yes' in answer.text.lower() or 'y' in answer.text.lower()
+
+
+def check_if_valid_date_piece(answer, message1, message2, more_than, less_than, with_default=False, default_value=None):
     while True:
         if with_default and answer.text == '-':
             if default_value is None:

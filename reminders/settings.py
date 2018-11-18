@@ -112,10 +112,6 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
 LOGGING = {
-    'root': {
-        'level': 'WARNING',
-        'handlers': ['console'],
-    },
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {

@@ -64,9 +64,9 @@ class BaseTask(celery.Task, metaclass=MetaBaseTask):
 
 
 class ProcessWebhook(BaseTask):
-    def run(self, *args, **kwargs):
+    def run(self, unicode_body, *args, **kwargs):
         logger.info('got webhook')
-        update = Update.de_json(json.loads(kwargs['unicode_body']), self.tg.bot)
+        update = Update.de_json(json.loads(unicode_body), self.tg.bot)
         self.tg.dispatcher.process_update(update)
 
 
@@ -126,6 +126,6 @@ app.tasks.register(RemindByPeriod())
 
 @worker_ready.connect()
 def setup_webhook(sender, **kwargs):
-    logger.info('Worker ready')
     tg = TelegramBot(settings.TELEGRAM_TOKEN)
     tg.setup()
+    logger.info('Worker ready')

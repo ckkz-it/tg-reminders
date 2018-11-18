@@ -6,13 +6,13 @@ from telegram.utils.request import Request
 
 import logging
 
-from .handlers import TelegramHandlers
-
 logger = logging.getLogger('MAIN')
 
 
 class TelegramBot(object):
     def __init__(self, token):
+        from .handlers import TelegramHandlers
+
         request = Request(proxy_url=settings.TELEGRAM_PROXY_URL,
                           urllib3_proxy_kwargs={
                               'username': settings.TELEGRAM_PROXY_USER,
@@ -32,3 +32,19 @@ class TelegramBot(object):
     def __setup_handlers(self):
         for handler in self.tg_handlers.get_handlers():
             self.dispatcher.add_handler(handler)
+
+
+class Message(object):
+    def __init__(self, body, **options):
+        self.body = body
+        self.options = options
+
+
+class Markdown(Message):
+    def __init__(self, body: object, options: object) -> object:
+        super(Markdown, self).__init__(body, parse_mode="Markdown", **options)
+
+
+class HTML(Message):
+    def __init__(self, body, **options):
+        super(HTML, self).__init__(body, parse_mode="HTML", **options)

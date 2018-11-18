@@ -12,6 +12,10 @@ class TelegramChat(models.Model):
     full_name = models.TextField(blank=True)
     telegram_username = models.TextField()
     date_joined = models.DateTimeField(auto_now_add=True)
+    is_super_user = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f'{self.telegram_username}: {self.full_name}'
 
 
 class Reminder(models.Model):
@@ -23,9 +27,16 @@ class Reminder(models.Model):
     done = models.BooleanField(default=False)
     processing = models.BooleanField(default=False)
 
+    def __str__(self):
+        return f'{self.message}. Done: {self.done}'
+
 
 class Todo(models.Model):
     telegram_chat = models.ForeignKey('TelegramChat', on_delete=models.CASCADE)
+    date_created = models.DateTimeField(auto_now_add=True)
     message = models.TextField()
-    category = models.TextField(blank=True)
+    category = models.TextField(default='No category', blank=True)
     done = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.message
