@@ -41,10 +41,10 @@ class Message(object):
 
 
 class Markdown(Message):
-    def __init__(self, body: object, options: object) -> object:
-        super(Markdown, self).__init__(body, parse_mode="Markdown", **options)
+    def __init__(self, body, **options):
+        super(Markdown, self).__init__(body, parse_mode='Markdown', **options)
 
 
 class HTML(Message):
     def __init__(self, body, **options):
-        super(HTML, self).__init__(body, parse_mode="HTML", **options)
+        super(HTML, self).__init__(body, parse_mode='HTML', **options)

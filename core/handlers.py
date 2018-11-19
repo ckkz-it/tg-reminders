@@ -82,13 +82,14 @@ class TelegramHandlers(object):
                 answer = self.todo_dialog[chat_id].send(update.message)
             except StopIteration:
                 del self.todo_dialog[chat_id]
-                return self.addtodo(bot, update)
+                self.current_command = None
+                return self.handle_message(bot, update)
         else:
             answer = next(self.todo_dialog[chat_id])
         logger.info(f'[addtodo] Answer: {answer}')
         self.send_message(bot, chat_id, answer)
 
-    def addtodoi(self, bot, update, *args):
+    def addtodoi(self, bot, update, args):
         if not len(args):
             self.send_message(bot, update.message.chat_id, 'Specify a todo message')
             return
@@ -99,7 +100,7 @@ class TelegramHandlers(object):
 
         self.send_message(bot, update.message.chat_id, Markdown(text))
 
-    def todos(self, bot, update, *args):
+    def todos(self, bot, update, args):
         """
         List all todos for current user. If category name is provided, list todos only
         related to this category. Category is provided in args
@@ -118,17 +119,26 @@ class TelegramHandlers(object):
         ).order_by('-date_created').order_by('category')
 
         text = ''
-        if args[0]:  # category
-            text += args[0]
+        if args and args[0]:  # category
+            text += f'*{args[0]}*\n'
             for todo in todos:
-                text += f'{todo.message} ({todo.id})'
+                if todo.done:
+                    text += f'`{todo.message} ({todo.id})`\n'
+                else:
+                    text += f'{todo.message} ({todo.id})\n'
         else:
             for todo in todos:
-                text += f'*{todo.category}:* {todo.message} ({todo.id})'
+                if todo.done:
+                    text += f'`{todo.category}: {todo.message} ({todo.id})`\n'
+                else:
+                    text += f'*{todo.category}:* {todo.message} ({todo.id})\n'
+
+        if not text:
+            text = 'You have no todos'
 
         self.send_message(bot, update.message.chat_id, Markdown(text))
 
-    def marktodo(self, bot, update, *args):
+    def marktodo(self, bot, update, args):
         """
         Mark tod0(s) with id(s) specified in args as done
         """
@@ -153,7 +163,7 @@ class TelegramHandlers(object):
 
         self.send_message(bot, update.message.chat_id, Markdown(text))
 
-    def removetodo(self, bot, update, *args):
+    def removetodo(self, bot, update, args):
         """
         Remove tod0(s) with id(s) specified in args
         """
@@ -250,6 +260,6 @@ class TelegramHandlers(object):
             CommandHandler('addtodoi', self.addtodoi, pass_args=True),
             CommandHandler('addtodo', self.addtodo),
             CommandHandler('removetodo', self.removetodo, pass_args=True),
-            MessageHandler(Filters.text, self.handle_message),
-            MessageHandler(Filters.text, self.unknown)
+            MessageHandler(Filters.text | Filters.command, self.handle_message),
+            MessageHandler(Filters.text | Filters.command, self.unknown)
         ]

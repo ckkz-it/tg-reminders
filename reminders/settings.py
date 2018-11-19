@@ -141,7 +141,7 @@ LOGGING = {
         'core.tasks': {
             'handlers': ['console', 'file_celery'],
             'level': 'DEBUG',
-            'propagate': True,
+            'propagate': False,
         }
     }
 }

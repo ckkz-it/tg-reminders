@@ -1,5 +1,5 @@
 import arrow
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup
 
 from .models import TelegramChat, Reminder, Todo
 from .telegram_api import Message, Markdown
@@ -119,44 +119,50 @@ def reminder_repeat():
         return None, None
 
 
-def todo_dialog(chat_id):
+def todo_dialog(chat_id=213256634):
     answer = yield 'Write a new todo message'
     message = answer.text
 
-    categories = list()
-    for todo in Todo.objects.filter(telegram_chat__telegram_id=chat_id, done=False):
-        categories.append([InlineKeyboardButton(todo.category)])
+    telegram_chat = TelegramChat.objects.get(telegram_id=chat_id)
 
-    reply_markup = InlineKeyboardMarkup(categories)
+    categories = list()
+    categories_buttons = list()
+    for todo in Todo.objects.filter(telegram_chat=telegram_chat, done=False):
+        if todo.category not in categories:
+            categories.append(todo.category)
+            categories_buttons.append([KeyboardButton(todo.category)])
+
+    reply_markup = ReplyKeyboardMarkup(categories_buttons, one_time_keyboard=True, resize_keyboard=True)
     answer = yield Message('Choose category or create new one', reply_markup=reply_markup)
     category = answer.text
 
-    todo = Todo.objects.create(message=message, category=category)
-    yield Markdown(f'Todo created\n*Message:* {todo.message}\nCategory: {todo.category}')
+    todo = Todo.objects.create(telegram_chat=telegram_chat, message=message, category=category)
 
+    # TODO: Remove keyboard
+    yield Markdown(f'Todo created\n*Message:* {todo.message}\n*Category:* {todo.category}')
 
-def ask_yes_or_no(question):
-    answer = yield question
-    while not (
-            'yes' in answer.text.lower() or 'no' in answer.text.lower() or
-            'y' in answer.text.lower() or 'n' in answer.text.lower()
-    ):
-        answer = yield '"yes" or "no?"'
-    return 'yes' in answer.text.lower() or 'y' in answer.text.lower()
+    def ask_yes_or_no(question):
+        answer = yield question
+        while not (
+                'yes' in answer.text.lower() or 'no' in answer.text.lower() or
+                'y' in answer.text.lower() or 'n' in answer.text.lower()
+        ):
+            answer = yield '"yes" or "no?"'
+        return 'yes' in answer.text.lower() or 'y' in answer.text.lower()
 
-
-def check_if_valid_date_piece(answer, message1, message2, more_than, less_than, with_default=False, default_value=None):
-    while True:
-        if with_default and answer.text == '-':
-            if default_value is None:
-                yield None
-            else:
-                return default_value
-        try:
-            value_to_check = int(answer.text)
-            if more_than < value_to_check < less_than:
-                break
-            answer = yield message1
-        except ValueError:
-            answer = yield message2
-    return value_to_check
+    def check_if_valid_date_piece(answer, message1, message2, more_than, less_than, with_default=False,
+                                  default_value=None):
+        while True:
+            if with_default and answer.text == '-':
+                if default_value is None:
+                    yield None
+                else:
+                    return default_value
+            try:
+                value_to_check = int(answer.text)
+                if more_than < value_to_check < less_than:
+                    break
+                answer = yield message1
+            except ValueError:
+                answer = yield message2
+        return value_to_check
