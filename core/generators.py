@@ -1,5 +1,5 @@
 import arrow
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup
+from telegram import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 from .models import TelegramChat, Reminder, Todo
 from .telegram_api import Message, Markdown
@@ -138,31 +138,35 @@ def todo_dialog(chat_id=213256634):
 
     todo = Todo.objects.create(telegram_chat=telegram_chat, message=message, category=category)
 
-    # TODO: Remove keyboard
-    yield Markdown(f'Todo created\n*Message:* {todo.message}\n*Category:* {todo.category}')
+    reply_markup = ReplyKeyboardRemove()
+    yield Markdown(
+        f'Todo created\n*Message:* {todo.message}\n*Category:* {todo.category}', reply_markup=reply_markup
+    )
 
-    def ask_yes_or_no(question):
-        answer = yield question
-        while not (
-                'yes' in answer.text.lower() or 'no' in answer.text.lower() or
-                'y' in answer.text.lower() or 'n' in answer.text.lower()
-        ):
-            answer = yield '"yes" or "no?"'
-        return 'yes' in answer.text.lower() or 'y' in answer.text.lower()
 
-    def check_if_valid_date_piece(answer, message1, message2, more_than, less_than, with_default=False,
-                                  default_value=None):
-        while True:
-            if with_default and answer.text == '-':
-                if default_value is None:
-                    yield None
-                else:
-                    return default_value
-            try:
-                value_to_check = int(answer.text)
-                if more_than < value_to_check < less_than:
-                    break
-                answer = yield message1
-            except ValueError:
-                answer = yield message2
-        return value_to_check
+def ask_yes_or_no(question):
+    answer = yield question
+    while not (
+            'yes' in answer.text.lower() or 'no' in answer.text.lower() or
+            'y' in answer.text.lower() or 'n' in answer.text.lower()
+    ):
+        answer = yield '"yes" or "no?"'
+    return 'yes' in answer.text.lower() or 'y' in answer.text.lower()
+
+
+def check_if_valid_date_piece(answer, message1, message2, more_than, less_than, with_default=False,
+                              default_value=None):
+    while True:
+        if with_default and answer.text == '-':
+            if default_value is None:
+                yield None
+            else:
+                return default_value
+        try:
+            value_to_check = int(answer.text)
+            if more_than < value_to_check < less_than:
+                break
+            answer = yield message1
+        except ValueError:
+            answer = yield message2
+    return value_to_check
