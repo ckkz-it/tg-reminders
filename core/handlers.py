@@ -42,8 +42,6 @@ class TelegramHandlers(object):
         user.full_name = tg_user.full_name
         user.save()
 
-        self.remind_dialog.pop(update.message.chat_id, None)
-
         if created:
             message = self.start_text
         else:
@@ -79,7 +77,7 @@ class TelegramHandlers(object):
 
         if chat_id in self.todo_dialog:
             try:
-                answer = self.todo_dialog[chat_id].send(update.message)
+                answer = self.todo_dialog[chat_id].send(update)
             except StopIteration:
                 del self.todo_dialog[chat_id]
                 self.current_command = None

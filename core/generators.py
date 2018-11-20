@@ -119,9 +119,10 @@ def reminder_repeat():
         return None, None
 
 
-def todo_dialog(chat_id=213256634):
-    answer = yield 'Write a new todo message'
-    message = answer.text
+def todo_dialog():
+    update = yield 'Write a new todo message'
+    message = update.message.text
+    chat_id = update.message.chat_id
 
     telegram_chat = TelegramChat.objects.get(telegram_id=chat_id)
 
@@ -133,8 +134,8 @@ def todo_dialog(chat_id=213256634):
             categories_buttons.append([KeyboardButton(todo.category)])
 
     reply_markup = ReplyKeyboardMarkup(categories_buttons, one_time_keyboard=True, resize_keyboard=True)
-    answer = yield Message('Choose category or create new one', reply_markup=reply_markup)
-    category = answer.text
+    update = yield Message('Choose category or create new one', reply_markup=reply_markup)
+    category = update.message.text
 
     todo = Todo.objects.create(telegram_chat=telegram_chat, message=message, category=category)
 
