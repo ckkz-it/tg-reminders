@@ -102,7 +102,7 @@ def remind_message(minute):
 
 
 def reminder_repeat():
-    should_repeat = ask_yes_or_no('Should repeat reminder?')
+    should_repeat = yield from ask_yes_or_no('Should repeat reminder? ("y" or "n")')
     if should_repeat:
         answer = yield 'How many times?'
         repeat_count = yield from check_if_valid_date_piece(
@@ -111,7 +111,7 @@ def reminder_repeat():
         answer = yield 'What period between reminds? In minutes.'
 
         repeat_period = yield from check_if_valid_date_piece(
-            answer, 'Should be less than 100', 'It should be a number', 1, 100
+            answer, 'Should be less than 100 and bigger than 1', 'It should be a number', 1, 100
         )
 
         return repeat_count, repeat_period
