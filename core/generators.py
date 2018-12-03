@@ -68,8 +68,8 @@ def remind_month_and_day(now):
                 answer = yield 'Day should be a number'
 
         if now.day > day:
-            answer = yield (f'Day {day} is already passed. Did you mean other month?\nIf so, '
-                            f'specify which one, type "-" to choose day again')
+            answer = yield (f'Day {day} is already passed. Did you mean other month?\n'
+                            f'If so, specify which one, type "-" to choose day again')
             month = yield from check_if_valid_date_piece(
                 answer, 'Month should be from 1 to 12', 'Month should be a number',
                 0, 13, with_default=True, default_value=None

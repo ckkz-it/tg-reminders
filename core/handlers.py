@@ -12,8 +12,13 @@ logger = logging.getLogger(__name__)
 
 class TelegramHandlers(object):
     def __init__(self):
-        self.help_text = '/remind  -  type this command to start setting reminder'
-        self.start_text = 'This is a simple reminder, type /help to see how to use it. Basic command is /remind'
+        self.help_text = ('*/remind*  -  type this command to start setting reminder\n'
+                          '*/addtodo*  -  add todo to your list\n'
+                          '*/removetodo*  -  remove todo(s) with given id(s)\n'
+                          '*/todos*  -  list all todos\n'
+                          '*/marktodo*  -  mark todo as done')
+        self.start_text = ('This is a simple reminder, type */help* to see how to use it.\n'
+                           'Basic commands are */remind* and */addtodo*')
         self.remind_dialog = collections.defaultdict(remind_dialog)
         self.todo_dialog = collections.defaultdict(todo_dialog)
         self.current_command = None
@@ -30,10 +35,13 @@ class TelegramHandlers(object):
         bot.send_message(chat_id=chat_id, text=text.body, **text.options)
 
     def unknown(self, bot, update):
-        self.send_message(bot, update.message.chat_id, 'Sorry, I did not understand that command.')
+        self.send_message(bot, update.message.chat_id, Markdown(
+            'Sorry, I did not understand that command.\n'
+            'Use */help* for available commands'
+        ))
 
     def help(self, bot, update):
-        self.send_message(bot, update.message.chat_id, self.help_text)
+        self.send_message(bot, update.message.chat_id, Markdown(self.help_text))
 
     def start(self, bot, update):
         tg_user = update.message.from_user
@@ -53,7 +61,7 @@ class TelegramHandlers(object):
         """
         Function to handle commands, which have some processing time. To answer question etc.
         """
-        if '/' not in update.message.text:
+        if '/' != update.message.text[0]:
             if self.current_command is not None:
                 return self.function_commands_map[self.current_command](bot, update)
         return self.unknown(bot, update)
