@@ -12,11 +12,11 @@ logger = logging.getLogger(__name__)
 
 class TelegramHandlers(object):
     def __init__(self):
-        self.help_text = ('*/remind*  -  type this command to start setting reminder\n'
-                          '*/addtodo*  -  add todo to your list\n'
-                          '*/removetodo*  -  remove todo(s) with given id(s)\n'
-                          '*/todos*  -  list all todos\n'
-                          '*/marktodo*  -  mark todo as done')
+        self.help_text = ('/remind  -  type this command to start setting reminder\n'
+                          '/addtodo  -  add todo to your list\n'
+                          '/removetodo  -  remove todo(s) with given id(s)\n'
+                          '/todos  -  list all todos\n'
+                          '/marktodo  -  mark todo as done')
         self.start_text = ('This is a simple reminder, type */help* to see how to use it.\n'
                            'Basic commands are */remind* and */addtodo*')
         self.remind_dialog = collections.defaultdict(remind_dialog)
@@ -41,7 +41,7 @@ class TelegramHandlers(object):
         ))
 
     def help(self, bot, update):
-        self.send_message(bot, update.message.chat_id, Markdown(self.help_text))
+        self.send_message(bot, update.message.chat_id, self.help_text)
 
     def start(self, bot, update):
         tg_user = update.message.from_user
@@ -223,6 +223,17 @@ class TelegramHandlers(object):
         logger.info(f'Answer: {answer}')
         self.send_message(bot, chat_id, answer)
 
+    def reminds(self, bot, update):
+        chat_id = update.message.chat_id
+        reminds = Reminder.objects.filter(telegram_chat__telegram_id=chat_id, done=False)
+        if not reminds:
+            self.send_message(bot, chat_id, 'You have no active reminds')
+            return
+        text = ''
+        for remind in reminds:
+            text += f'*{remind.id}:* {remind.message if remind.message else "No message"}\n'
+        self.send_message(bot, chat_id, Markdown(text))
+
     def remindi(self, bot, update, args):
         if len(args) == 0:
             bot.send_message(chat_id=update.message.chat_id, text='Provide args')
@@ -261,6 +272,7 @@ class TelegramHandlers(object):
             CommandHandler('help', self.help),
             CommandHandler('remindi', self.remindi, pass_args=True),
             CommandHandler('remind', self.remind),
+            CommandHandler('reminds', self.reminds),
             CommandHandler('todos', self.todos, pass_args=True),
             CommandHandler('marktodo', self.marktodo, pass_args=True),
             CommandHandler('addtodoi', self.addtodoi, pass_args=True),
