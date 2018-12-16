@@ -17,11 +17,11 @@ class TelegramHandlers(object):
                           '/removetodo  -  remove todo(s) with given id(s)\n'
                           '/todos  -  list all todos\n'
                           '/marktodo  -  mark todo as done')
-        self.start_text = ('This is a simple reminder, type */help* to see how to use it.\n'
-                           'Basic commands are */remind* and */addtodo*')
+        self.start_text = ('This is a simple reminder, type /help to see how to use it.\n'
+                           'Basic commands are /remind and /addtodo')
         self.remind_dialog = collections.defaultdict(remind_dialog)
         self.todo_dialog = collections.defaultdict(todo_dialog)
-        self.current_command = None
+        self.current_command = dict()
         self.function_commands_map = {
             'remind': self.remind,
             'addtodo': self.addtodo,
@@ -61,15 +61,16 @@ class TelegramHandlers(object):
         """
         Function to handle commands, which have some processing time. To answer question etc.
         """
+        chat_id = update.message.chat_id
         if '/' != update.message.text[0]:
-            if self.current_command is not None:
-                return self.function_commands_map[self.current_command](bot, update)
+            if chat_id in self.current_command:
+                return self.function_commands_map[self.current_command[chat_id]](bot, update)
         return self.unknown(bot, update)
 
     def addtodo(self, bot, update):
         logger.info(f'[addtodo]: Received: {update.message}')
-        self.current_command = 'addtodo'
         chat_id = update.message.chat_id
+        self.current_command[chat_id] = 'addtodo'
 
         if update.message.text == '/addtodo':
             # Start new
@@ -88,7 +89,7 @@ class TelegramHandlers(object):
                 answer = self.todo_dialog[chat_id].send(update)
             except StopIteration:
                 del self.todo_dialog[chat_id]
-                self.current_command = None
+                self.current_command.pop(chat_id, None)
                 return self.handle_message(bot, update)
         else:
             answer = next(self.todo_dialog[chat_id])
@@ -194,8 +195,8 @@ class TelegramHandlers(object):
 
     def remind(self, bot, update):
         logger.info(f'[remind] Received: {update.message}')
-        self.current_command = 'remind'
         chat_id = update.message.chat_id
+        self.current_command[chat_id] = 'remind'
 
         if update.message.text == '/remind':
             # Start new
